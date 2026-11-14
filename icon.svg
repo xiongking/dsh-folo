@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Folo RSS reader">
+  <defs>
+    <linearGradient id="folo-bg" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fb923c"/>
+      <stop offset="0.55" stop-color="#f97316"/>
+      <stop offset="1" stop-color="#ea580c"/>
+    </linearGradient>
+    <linearGradient id="folo-gloss" x1="32" y1="4" x2="32" y2="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#folo-bg)"/>
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#folo-gloss)"/>
+  <g fill="none" stroke="#ffffff" stroke-linecap="round" stroke-width="4.5">
+    <path d="M19 45a2.2 2.2 0 1 1 4.4 0 2.2 2.2 0 0 1-4.4 0z" fill="#ffffff" stroke="none"/>
+    <path d="M19 33.5a11.5 11.5 0 0 1 11.5 11.5"/>
+    <path d="M19 22a23 23 0 0 1 23 23"/>
+  </g>
+</svg>

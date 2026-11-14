@@ -1,0 +1,88 @@
+{
+  "meta": {
+    "title": "Folo 订阅阅读器",
+    "description": "订阅 RSS 与 Atom 源，用三栏阅读视图阅读，并在侧边栏保留未读与收藏状态。"
+  },
+  "panel": {
+    "title": "Folo",
+    "subtitle": "订阅阅读器"
+  },
+  "nav": {
+    "inbox": "收件箱",
+    "all": "全部文章",
+    "unread": "未读",
+    "starred": "收藏",
+    "subscriptions": "订阅源",
+    "empty": "还没有订阅",
+    "addFeed": "添加订阅",
+    "importOpml": "导入 OPML",
+    "exportOpml": "导出 OPML",
+    "settings": "书库"
+  },
+  "action": {
+    "refresh": "刷新订阅",
+    "refreshing": "正在刷新…",
+    "markAllRead": "全部标为已读",
+    "subscribe": "订阅",
+    "cancel": "取消",
+    "close": "关闭",
+    "search": "搜索文章",
+    "clearSearch": "清除搜索",
+    "unsubscribe": "取消订阅",
+    "openOriginal": "打开原文",
+    "star": "收藏",
+    "unstar": "取消收藏",
+    "markRead": "标为已读",
+    "markUnread": "标为未读",
+    "back": "返回列表",
+    "addFirstFeed": "添加第一个订阅",
+    "retry": "重试"
+  },
+  "list": {
+    "empty": "这里还没有内容",
+    "emptyHint": "抓取订阅源之后文章会出现在这里。",
+    "noFeeds": "还没有订阅源",
+    "noFeedsHint": "添加一个 RSS 或 Atom 源，或从其他阅读器导入 OPML 文件。",
+    "noMatch": "没有匹配的文章",
+    "noMatchHint": "换一个搜索词试试。",
+    "count": "{count} 篇文章",
+    "unreadCount": "{count} 篇未读",
+    "markAllConfirm": "已把 {count} 篇文章标为已读"
+  },
+  "reader": {
+    "empty": "选择一篇文章",
+    "emptyHint": "从左侧列表中挑一篇，正文会显示在这里。",
+    "loading": "正在加载文章…",
+    "byAuthor": "作者：{author}",
+    "noContent": "这篇文章没有正文内容，可以打开原文阅读。",
+    "error": "无法加载这篇文章。"
+  },
+  "dialog": {
+    "addTitle": "添加订阅源",
+    "addHint": "粘贴 RSS 或 Atom 地址。如果网站声明了订阅源，直接填网址也可以。",
+    "addPlaceholder": "https://example.com/feed.xml",
+    "importTitle": "导入 OPML",
+    "importHint": "选择从其他阅读器导出的 OPML 文件。",
+    "importButton": "选择文件"
+  },
+  "toast": {
+    "subscribed": "已订阅 {title}",
+    "alreadySubscribed": "这个订阅源已经在书库里了",
+    "refreshed": "订阅已刷新",
+    "refreshFailed": "刷新完成，但有订阅源出错",
+    "noFeeds": "请先添加订阅源",
+    "starred": "已收藏",
+    "unstarred": "已取消收藏",
+    "imported": "已导入 {count} 个订阅源",
+    "importEmpty": "文件里没有找到订阅源",
+    "exported": "已导出 OPML",
+    "unsubscribed": "已移除订阅源",
+    "error": "出错了"
+  },
+  "state": {
+    "unreadBadge": "{count} 篇未读",
+    "feedError": "上次抓取失败：{message}",
+    "neverFetched": "尚未抓取",
+    "updated": "更新于 {when}"
+  }
+}

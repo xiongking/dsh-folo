@@ -1,0 +1,88 @@
+{
+  "meta": {
+    "title": "Folo RSS reader",
+    "description": "Subscribe to RSS and Atom feeds, read them in a three-pane reader, and keep unread and starred state in the sidebar."
+  },
+  "panel": {
+    "title": "Folo",
+    "subtitle": "RSS reader"
+  },
+  "nav": {
+    "inbox": "Inbox",
+    "all": "All entries",
+    "unread": "Unread",
+    "starred": "Starred",
+    "subscriptions": "Subscriptions",
+    "empty": "No subscriptions",
+    "addFeed": "Add feed",
+    "importOpml": "Import OPML",
+    "exportOpml": "Export OPML",
+    "settings": "Library"
+  },
+  "action": {
+    "refresh": "Refresh feeds",
+    "refreshing": "Refreshing…",
+    "markAllRead": "Mark all as read",
+    "subscribe": "Subscribe",
+    "cancel": "Cancel",
+    "close": "Close",
+    "search": "Search entries",
+    "clearSearch": "Clear search",
+    "unsubscribe": "Unsubscribe",
+    "openOriginal": "Open original",
+    "star": "Star",
+    "unstar": "Remove star",
+    "markRead": "Mark as read",
+    "markUnread": "Mark as unread",
+    "back": "Back to list",
+    "addFirstFeed": "Add your first feed",
+    "retry": "Try again"
+  },
+  "list": {
+    "empty": "Nothing here yet",
+    "emptyHint": "Entries show up after a feed is fetched.",
+    "noFeeds": "No feeds yet",
+    "noFeedsHint": "Add an RSS or Atom feed, or import an OPML file from another reader.",
+    "noMatch": "No matching entries",
+    "noMatchHint": "Try a different search term.",
+    "count": "{count} entries",
+    "unreadCount": "{count} unread",
+    "markAllConfirm": "Marked {count} entries as read"
+  },
+  "reader": {
+    "empty": "Select an entry",
+    "emptyHint": "Pick something from the list to read it here.",
+    "loading": "Loading entry…",
+    "byAuthor": "by {author}",
+    "noContent": "This entry has no content. Open the original to read it.",
+    "error": "Could not load this entry."
+  },
+  "dialog": {
+    "addTitle": "Add a feed",
+    "addHint": "Paste an RSS or Atom URL. A website address also works when the site advertises a feed.",
+    "addPlaceholder": "https://example.com/feed.xml",
+    "importTitle": "Import OPML",
+    "importHint": "Pick an OPML file exported from another reader.",
+    "importButton": "Choose file"
+  },
+  "toast": {
+    "subscribed": "Subscribed to {title}",
+    "alreadySubscribed": "That feed is already in your library",
+    "refreshed": "Feeds refreshed",
+    "refreshFailed": "Refresh finished with errors",
+    "noFeeds": "Add a feed first",
+    "starred": "Starred",
+    "unstarred": "Star removed",
+    "imported": "Imported {count} feeds",
+    "importEmpty": "No feeds found in that file",
+    "exported": "OPML exported",
+    "unsubscribed": "Feed removed",
+    "error": "Something went wrong"
+  },
+  "state": {
+    "unreadBadge": "{count} unread entries",
+    "feedError": "Last fetch failed: {message}",
+    "neverFetched": "Not fetched yet",
+    "updated": "Updated {when}"
+  }
+}
