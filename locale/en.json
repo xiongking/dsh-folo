@@ -1,11 +1,18 @@
 {
   "meta": {
     "title": "Folo RSS reader",
-    "description": "Subscribe to RSS and Atom feeds, read them in a three-pane reader, and keep unread and starred state in the sidebar."
+    "description": "Subscribe to RSS and Atom feeds, read them in a two-pane reader, and keep unread and starred state in the sidebar."
   },
   "panel": {
     "title": "Folo",
     "subtitle": "RSS reader"
+  },
+  "toolbar": {
+    "allFeeds": "All subscriptions"
+  },
+  "splitter": {
+    "label": "Resize the entry list",
+    "hint": "Drag, or use the arrow keys, to change the list width."
   },
   "nav": {
     "inbox": "Inbox",
@@ -36,7 +43,9 @@
     "markUnread": "Mark as unread",
     "back": "Back to list",
     "addFirstFeed": "Add your first feed",
-    "retry": "Try again"
+    "retry": "Try again",
+    "settings": "Reading settings",
+    "feeds": "Choose subscriptions"
   },
   "list": {
     "empty": "Nothing here yet",
@@ -84,5 +93,31 @@
     "feedError": "Last fetch failed: {message}",
     "neverFetched": "Not fetched yet",
     "updated": "Updated {when}"
+  },
+  "settings": {
+    "title": "Reading settings",
+    "language": "Interface language",
+    "languageHint": "Changes this reader's own labels; the rest of DeepSeek keeps its language.",
+    "auto": "Follow DeepSeek",
+    "zh": "简体中文",
+    "en": "English"
+  },
+  "error": {
+    "invalid_url": "That is not a valid URL.",
+    "url_required": "Enter a feed address first.",
+    "unsupported_protocol": "Only http and https feeds are supported.",
+    "no_feed": "No RSS or Atom feed was found at that address.",
+    "http_status": "The feed server returned an error.",
+    "too_large": "That feed is too large to load.",
+    "empty_feed": "That feed document has no entries.",
+    "empty_opml": "The OPML file is empty.",
+    "title_required": "A subscription title is required.",
+    "entry_not_found": "That entry is no longer available.",
+    "unknown_operation": "Unknown operation.",
+    "forbidden": "The request was refused.",
+    "bad_json": "The request body was malformed.",
+    "invalid_setting": "That setting value is not accepted.",
+    "unreachable": "Could not reach that feed. Try again later.",
+    "unknown": "Something went wrong."
   }
 }

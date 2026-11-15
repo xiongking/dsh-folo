@@ -1,6 +1,6 @@
 {
   "name": "dsh-folo",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
   "type": "module",
   "description": "A Folo-style RSS reader panel for DeepSeek Harness: subscribe, read, star and refresh feeds from the sidebar.",

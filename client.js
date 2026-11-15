@@ -40,13 +40,17 @@ window.__ModuleLoader__.load({
       })
       if (!response.ok) {
         let message = `HTTP ${response.status}`
+        let code = ''
         try {
           const body = await response.json()
           if (body && typeof body.error === 'string') message = body.error
+          if (body && typeof body.code === 'string') code = body.code
         } catch {
           /* keep the status text */
         }
-        throw new Error(message)
+        const failure = new Error(message)
+        if (code) failure.code = code
+        throw failure
       }
       return response
     }
@@ -82,11 +86,18 @@ window.__ModuleLoader__.load({
       en: {
   "meta": {
     "title": "Folo RSS reader",
-    "description": "Subscribe to RSS and Atom feeds, read them in a three-pane reader, and keep unread and starred state in the sidebar."
+    "description": "Subscribe to RSS and Atom feeds, read them in a two-pane reader, and keep unread and starred state in the sidebar."
   },
   "panel": {
     "title": "Folo",
     "subtitle": "RSS reader"
+  },
+  "toolbar": {
+    "allFeeds": "All subscriptions"
+  },
+  "splitter": {
+    "label": "Resize the entry list",
+    "hint": "Drag, or use the arrow keys, to change the list width."
   },
   "nav": {
     "inbox": "Inbox",
@@ -117,7 +128,9 @@ window.__ModuleLoader__.load({
     "markUnread": "Mark as unread",
     "back": "Back to list",
     "addFirstFeed": "Add your first feed",
-    "retry": "Try again"
+    "retry": "Try again",
+    "settings": "Reading settings",
+    "feeds": "Choose subscriptions"
   },
   "list": {
     "empty": "Nothing here yet",
@@ -165,16 +178,49 @@ window.__ModuleLoader__.load({
     "feedError": "Last fetch failed: {message}",
     "neverFetched": "Not fetched yet",
     "updated": "Updated {when}"
+  },
+  "settings": {
+    "title": "Reading settings",
+    "language": "Interface language",
+    "languageHint": "Changes this reader's own labels; the rest of DeepSeek keeps its language.",
+    "auto": "Follow DeepSeek",
+    "zh": "简体中文",
+    "en": "English"
+  },
+  "error": {
+    "invalid_url": "That is not a valid URL.",
+    "url_required": "Enter a feed address first.",
+    "unsupported_protocol": "Only http and https feeds are supported.",
+    "no_feed": "No RSS or Atom feed was found at that address.",
+    "http_status": "The feed server returned an error.",
+    "too_large": "That feed is too large to load.",
+    "empty_feed": "That feed document has no entries.",
+    "empty_opml": "The OPML file is empty.",
+    "title_required": "A subscription title is required.",
+    "entry_not_found": "That entry is no longer available.",
+    "unknown_operation": "Unknown operation.",
+    "forbidden": "The request was refused.",
+    "bad_json": "The request body was malformed.",
+    "invalid_setting": "That setting value is not accepted.",
+    "unreachable": "Could not reach that feed. Try again later.",
+    "unknown": "Something went wrong."
   }
 },
       zh: {
   "meta": {
     "title": "Folo 订阅阅读器",
-    "description": "订阅 RSS 与 Atom 源，用三栏阅读视图阅读，并在侧边栏保留未读与收藏状态。"
+    "description": "订阅 RSS 与 Atom 源，在双栏阅读视图里阅读，并在侧边栏保留未读与收藏状态。"
   },
   "panel": {
     "title": "Folo",
     "subtitle": "订阅阅读器"
+  },
+  "toolbar": {
+    "allFeeds": "全部订阅源"
+  },
+  "splitter": {
+    "label": "调整列表宽度",
+    "hint": "拖动或使用方向键改变列表宽度。"
   },
   "nav": {
     "inbox": "收件箱",
@@ -205,7 +251,9 @@ window.__ModuleLoader__.load({
     "markUnread": "标为未读",
     "back": "返回列表",
     "addFirstFeed": "添加第一个订阅",
-    "retry": "重试"
+    "retry": "重试",
+    "settings": "阅读设置",
+    "feeds": "选择订阅源"
   },
   "list": {
     "empty": "这里还没有内容",
@@ -253,6 +301,32 @@ window.__ModuleLoader__.load({
     "feedError": "上次抓取失败：{message}",
     "neverFetched": "尚未抓取",
     "updated": "更新于 {when}"
+  },
+  "settings": {
+    "title": "阅读设置",
+    "language": "界面语言",
+    "languageHint": "只影响这个阅读器的界面文案，DeepSeek 其余部分保持原语言。",
+    "auto": "跟随 DeepSeek",
+    "zh": "简体中文",
+    "en": "English"
+  },
+  "error": {
+    "invalid_url": "这不是一个有效的网址。",
+    "url_required": "请先填写订阅源地址。",
+    "unsupported_protocol": "只支持 http 与 https 订阅源。",
+    "no_feed": "这个地址上没有找到 RSS 或 Atom 订阅源。",
+    "http_status": "订阅源服务器返回了错误。",
+    "too_large": "这个订阅源太大，无法加载。",
+    "empty_feed": "这个订阅源文档里没有内容。",
+    "empty_opml": "OPML 文件是空的。",
+    "title_required": "订阅源标题不能为空。",
+    "entry_not_found": "这篇文章已经不存在了。",
+    "unknown_operation": "未知操作。",
+    "forbidden": "请求被拒绝。",
+    "bad_json": "请求内容格式有误。",
+    "invalid_setting": "这个设置值不被接受。",
+    "unreachable": "连不上这个订阅源，请稍后再试。",
+    "unknown": "出错了。"
   }
 },
     }
@@ -282,6 +356,83 @@ window.__ModuleLoader__.load({
     }
 
     const unreadCounter = createCounter()
+
+    // -----------------------------------------------------------------------
+    // Interface preferences: the reader keeps its own language and pane width
+    // so switching them never touches the rest of the Harness.
+    // -----------------------------------------------------------------------
+
+    const DEFAULT_PREFS = { locale: 'zh', listWidth: 0 }
+
+    function createPrefs() {
+      let value = { ...DEFAULT_PREFS }
+      const listeners = new Set()
+      return {
+        get: () => value,
+        set(next) {
+          const merged = {
+            locale: ['auto', 'zh', 'en'].includes(next && next.locale) ? next.locale : value.locale,
+            listWidth: next && Number.isFinite(next.listWidth) && next.listWidth > 0
+              ? Math.round(next.listWidth)
+              : value.listWidth,
+          }
+          if (merged.locale === value.locale && merged.listWidth === value.listWidth) return
+          value = merged
+          for (const listener of [...listeners]) listener()
+        },
+        subscribe(listener) {
+          listeners.add(listener)
+          return () => {
+            listeners.delete(listener)
+          }
+        },
+      }
+    }
+
+    const prefs = createPrefs()
+
+    // The Harness locale, read live: `auto` follows it without caching.
+    let harnessLocale = () => 'en'
+
+    function resolveLanguage() {
+      const preference = prefs.get().locale
+      if (preference === 'zh' || preference === 'en') return preference
+      return String(harnessLocale() || '').toLowerCase().startsWith('zh') ? 'zh' : 'en'
+    }
+
+    function uiLocale() {
+      return resolveLanguage() === 'zh' ? 'zh-CN' : 'en-US'
+    }
+
+    function readPath(dictionary, key) {
+      let cursor = dictionary
+      for (const part of String(key).split('.')) {
+        if (!cursor || typeof cursor !== 'object') return undefined
+        cursor = cursor[part]
+      }
+      return typeof cursor === 'string' ? cursor : undefined
+    }
+
+    function translate(key, values) {
+      const language = resolveLanguage()
+      const text = readPath(DICTIONARIES[language], key)
+        ?? readPath(DICTIONARIES.zh, key)
+        ?? key
+      return values ? fill(text, values) : text
+    }
+
+    // Errors arrive with a stable code; fall back to the server message only
+    // when the code is one this build does not know.
+    function errorText(error) {
+      const code = error && error.code
+      if (code) {
+        const text = readPath(DICTIONARIES[resolveLanguage()], `error.${code}`)
+          ?? readPath(DICTIONARIES.zh, `error.${code}`)
+        if (typeof text === 'string') return text
+      }
+      if (error instanceof Error && error.message) return error.message
+      return translate('error.unknown')
+    }
 
     // -----------------------------------------------------------------------
     // HTML sanitizing for feed content
@@ -471,6 +622,8 @@ window.__ModuleLoader__.load({
       upload: props => h(Icon, props, h('path', { d: 'M12 16V6' }), h('path', { d: 'm8 9 4-4 4 4' }), h('path', { d: 'M5 19h14' })),
       inbox: props => h(Icon, props, h('path', { d: 'M4 13h4l1.5 2.5h5L16 13h4' }), h('path', { d: 'M5.5 5.5h13l1.5 7.5v4.5A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5V13z' })),
       library: props => h(Icon, props, h('rect', { x: 4.5, y: 4.5, width: 15, height: 15, rx: 2.5 }), h('path', { d: 'M4.5 9.5h15' }), h('path', { d: 'M10 9.5V19.5' })),
+      chevron: props => h(Icon, props, h('path', { d: 'm7 10 5 5 5-5' })),
+      gear: props => h(Icon, props, h('circle', { cx: 12, cy: 12, r: 3.1 }), h('path', { d: 'M19.4 14.4a7.6 7.6 0 0 0 0-4.8l1.7-1.1-1.9-3.3-1.9 1a7.6 7.6 0 0 0-4.2-2.4L12.8 2h-3.6l-.3 1.8a7.6 7.6 0 0 0-4.2 2.4l-1.9-1L1 8.5l1.7 1.1a7.6 7.6 0 0 0 0 4.8L1 15.5l1.9 3.3 1.9-1a7.6 7.6 0 0 0 4.2 2.4l.3 1.8h3.6l.3-1.8a7.6 7.6 0 0 0 4.2-2.4l1.9 1 1.9-3.3z' })),
     }
 
     function StarGlyph({ filled, size = 14 }) {
@@ -619,21 +772,52 @@ window.__ModuleLoader__.load({
 .folo-toast-icon{display:grid;place-items:center;color:var(--dsw-alias-state-success-primary)}
 .folo-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 @media (max-width:1060px){
-.folo-nav{width:196px}
-.folo-list{width:296px}
 .folo-article{padding:22px 22px 64px}
 .folo-article-title{font-size:21px}
 }
-@media (max-width:880px){
-.folo-nav{display:none}
-.folo-list{width:auto;flex:1;border-right:0}
-.folo-reader{position:absolute;inset:54px 0 0;z-index:5;background:var(--dsw-alias-bg-layer-1)}
-.folo-reader.is-hidden{display:none}
+@media (max-width:820px){
+.folo-splitter{display:none}
+.folo-listcol{flex:1 1 auto;width:auto!important}
+.folo-reader{flex:1 1 auto;width:100%;border-left:0}
 .folo-article{padding:18px 18px 64px}
+.folo-article-title{font-size:19px}
 }
 @media (prefers-reduced-motion:reduce){
 .folo-spin{animation-duration:2.4s}
 }
+
+/* --- two-pane layout with a user-draggable divider --- */
+.folo-root.is-dragging,.folo-root.is-dragging *{cursor:col-resize!important;user-select:none!important}
+.folo-listcol{display:flex;flex-direction:column;flex:none;min-width:0;min-height:0;background:var(--dsw-alias-bg-base)}
+.folo-splitter{position:relative;flex:0 0 7px;margin:0 -3px;z-index:3;cursor:col-resize;touch-action:none}
+.folo-splitter::before{content:"";position:absolute;inset:0 3px;background:var(--dsw-alias-border-l1);transition:background .12s ease}
+.folo-splitter:hover::before,.folo-splitter.is-active::before{background:var(--dsw-alias-brand-primary)}
+.folo-splitter:focus-visible{outline:none}
+.folo-splitter:focus-visible::before{background:var(--dsw-alias-brand-primary)}
+.folo-toolbar{position:relative;display:flex;align-items:center;gap:6px;flex:none;padding:8px 10px;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.folo-tabs{display:inline-flex;align-items:center;gap:2px;flex:none;padding:2px;border-radius:9px;background:color-mix(in srgb, var(--dsw-alias-label-secondary) 10%, transparent)}
+.folo-tab{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:7px;font-size:11.5px;white-space:nowrap;color:var(--dsw-alias-label-secondary)}
+.folo-tab:hover{color:var(--dsw-alias-label-primary)}
+.folo-tab.is-active{background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);box-shadow:0 1px 2px rgba(0,0,0,.16)}
+.folo-tab-count{font-size:10px;font-variant-numeric:tabular-nums;opacity:.7}
+.folo-feedbtn{display:inline-flex;align-items:center;gap:6px;height:28px;flex:1 1 auto;min-width:0;padding:0 7px;border-radius:8px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);font-size:11.5px;color:var(--dsw-alias-label-primary);text-align:left}
+.folo-feedbtn:hover{border-color:var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2)}
+.folo-feedbtn-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folo-menu{position:absolute;top:calc(100% - 3px);left:10px;right:10px;z-index:20;display:flex;flex-direction:column;max-height:min(430px,72vh);padding:6px;border-radius:11px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-overlay);box-shadow:0 16px 40px rgba(0,0,0,.3);overflow:hidden}
+.folo-menu-scroll{overflow-y:auto;overscroll-behavior:contain;min-height:0}
+.folo-menu-label{padding:7px 8px 3px;font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--dsw-alias-label-secondary)}
+.folo-menu-row{display:flex;align-items:center;gap:8px;width:100%;height:30px;padding:0 8px;border-radius:7px;font-size:12.5px;text-align:left}
+.folo-menu-row:hover{background:color-mix(in srgb, var(--dsw-alias-label-secondary) 12%, transparent)}
+.folo-menu-row.is-active{background:color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, transparent)}
+.folo-menu-sep{height:1px;margin:5px 4px;background:var(--dsw-alias-border-l1)}
+.folo-menu-actions{display:flex;flex-direction:column;gap:1px;flex:none}
+.folo-settings-row{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:2px 0 12px}
+.folo-settings-label{font-size:12.5px;font-weight:500}
+.folo-settings-hint{font-size:11px;line-height:1.5;color:var(--dsw-alias-label-secondary);margin-top:3px;max-width:270px}
+.folo-lang{display:inline-flex;flex:none;padding:2px;gap:2px;border-radius:9px;background:color-mix(in srgb, var(--dsw-alias-label-secondary) 10%, transparent)}
+.folo-lang button{height:26px;padding:0 10px;border-radius:7px;font-size:12px;white-space:nowrap;color:var(--dsw-alias-label-secondary)}
+.folo-lang button.is-active{background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);box-shadow:0 1px 2px rgba(0,0,0,.16)}
+.folo-dragging-shield{position:absolute;inset:0;z-index:19}
 `
 
     // -----------------------------------------------------------------------
@@ -691,9 +875,70 @@ window.__ModuleLoader__.load({
     // Panel
     // -----------------------------------------------------------------------
 
-    function Panel({ env }) {
-      const { t, localeId } = env
-      const narrow = useMediaQuery('(max-width: 880px)')
+    // -----------------------------------------------------------------------
+    // Settings dialog
+    // -----------------------------------------------------------------------
+
+    function SettingsDialog({ locale, onChange, onClose }) {
+      const closeRef = useRef(null)
+      useEffect(() => {
+        closeRef.current?.focus()
+        const onKey = event => {
+          if (event.key === 'Escape') onClose()
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+      }, [onClose])
+
+      const choices = [
+        ['zh', translate('settings.zh')],
+        ['en', translate('settings.en')],
+        ['auto', translate('settings.auto')],
+      ]
+
+      return h('div', {
+        className: 'folo-backdrop',
+        onMouseDown: event => {
+          if (event.target === event.currentTarget) onClose()
+        },
+      },
+        h('div', { className: 'folo-dialog', role: 'dialog', 'aria-modal': 'true', 'aria-label': translate('settings.title') },
+          h('div', { className: 'folo-dialog-title' }, translate('settings.title')),
+          h('div', { className: 'folo-settings-row' },
+            h('div', { style: { minWidth: 0 } },
+              h('div', { className: 'folo-settings-label' }, translate('settings.language')),
+              h('div', { className: 'folo-settings-hint' }, translate('settings.languageHint'))),
+            h('div', { className: 'folo-lang' },
+              choices.map(([value, label]) => h('button', {
+                key: value,
+                type: 'button',
+                className: value === locale ? 'is-active' : undefined,
+                'aria-pressed': value === locale,
+                onClick: () => onChange(value),
+              }, label)))),
+          h('div', { className: 'folo-dialog-foot' },
+            h('button', { type: 'button', ref: closeRef, className: 'folo-btn', onClick: onClose }, translate('action.close')))))
+    }
+
+    // -----------------------------------------------------------------------
+    // Panel
+    // -----------------------------------------------------------------------
+
+    const MIN_LIST_WIDTH = 300
+    const MAX_LIST_WIDTH = 760
+    const READER_MIN_WIDTH = 340
+
+    function clampListWidth(width, containerWidth) {
+      const available = Number.isFinite(containerWidth) && containerWidth > 0
+        ? containerWidth - READER_MIN_WIDTH
+        : MAX_LIST_WIDTH
+      const upper = Math.max(MIN_LIST_WIDTH, Math.min(MAX_LIST_WIDTH, available))
+      return Math.round(Math.min(upper, Math.max(MIN_LIST_WIDTH, width)))
+    }
+
+    function Panel() {
+      const narrow = useMediaQuery('(max-width: 820px)')
+      const preference = useSyncExternalStore(prefs.subscribe, prefs.get, prefs.get)
       const [snapshot, setSnapshot] = useState(null)
       const [status, setStatus] = useState('loading')
       const [loadError, setLoadError] = useState('')
@@ -707,8 +952,15 @@ window.__ModuleLoader__.load({
       const [toast, setToast] = useState(null)
       const [mobilePane, setMobilePane] = useState('list')
       const [headerInset, setHeaderInset] = useState(0)
+      const [listWidth, setListWidth] = useState(() => clampListWidth(prefs.get().listWidth || 380))
+      const [dragging, setDragging] = useState(false)
+      const [menuOpen, setMenuOpen] = useState(false)
       const headerRef = useRef(null)
       const rootRef = useRef(null)
+      const menuRef = useRef(null)
+      const listWidthRef = useRef(listWidth)
+      const dragRef = useRef(null)
+      listWidthRef.current = listWidth
 
       const notify = useCallback((message, kind = 'info') => {
         setToast({ message, kind, id: Date.now() })
@@ -719,6 +971,16 @@ window.__ModuleLoader__.load({
         const timer = window.setTimeout(() => setToast(null), toast.kind === 'error' ? 5200 : 3200)
         return () => window.clearTimeout(timer)
       }, [toast])
+
+      const updateSettings = useCallback(async patch => {
+        prefs.set({ ...prefs.get(), ...patch })
+        try {
+          const result = await sendOperation('settings', patch)
+          if (result && result.settings) prefs.set(result.settings)
+        } catch {
+          /* a preference that fails to persist is not worth interrupting reading */
+        }
+      }, [])
 
       const applySnapshot = useCallback(next => {
         if (!next || !next.ok) return
@@ -734,7 +996,7 @@ window.__ModuleLoader__.load({
           setLoadError('')
         } catch (error) {
           setStatus('error')
-          setLoadError(error instanceof Error ? error.message : String(error))
+          setLoadError(errorText(error))
         }
       }, [applySnapshot])
 
@@ -748,13 +1010,26 @@ window.__ModuleLoader__.load({
         }
       }, [load])
 
+      // The stored preferences arrive with the first snapshot.
+      const hydratedRef = useRef(false)
+      useEffect(() => {
+        if (hydratedRef.current || !snapshot || !snapshot.settings) return
+        hydratedRef.current = true
+        prefs.set(snapshot.settings)
+        if (snapshot.settings.listWidth) {
+          const width = clampListWidth(snapshot.settings.listWidth, rootRef.current?.getBoundingClientRect().width)
+          listWidthRef.current = width
+          setListWidth(width)
+        }
+      }, [snapshot])
+
       const feeds = snapshot?.feeds || []
       const entries = snapshot?.entries || []
       const feedsById = useMemo(() => new Map(feeds.map(feed => [feed.id, feed])), [feeds])
 
       const refresh = useCallback(async ({ silent = false, feedIds } = {}) => {
         if (!feeds.length) {
-          if (!silent) notify(t('toast.noFeeds'))
+          if (!silent) notify(translate('toast.noFeeds'))
           return
         }
         setBusy(current => ({ ...current, refresh: true }))
@@ -763,14 +1038,17 @@ window.__ModuleLoader__.load({
           if (result.snapshot) applySnapshot(result.snapshot)
           const failed = (result.results || []).filter(item => item.error)
           if (!silent) {
-            notify(failed.length ? t('toast.refreshFailed') : t('toast.refreshed'), failed.length ? 'error' : 'info')
+            notify(
+              failed.length ? translate('toast.refreshFailed') : translate('toast.refreshed'),
+              failed.length ? 'error' : 'info',
+            )
           }
         } catch (error) {
-          if (!silent) notify(error instanceof Error ? error.message : t('toast.error'), 'error')
+          if (!silent) notify(errorText(error), 'error')
         } finally {
           setBusy(current => ({ ...current, refresh: false }))
         }
-      }, [applySnapshot, feeds.length, notify, t])
+      }, [applySnapshot, feeds.length, notify])
 
       // Refresh stale libraries on open, then on a slow interval while visible.
       useEffect(() => {
@@ -811,6 +1089,21 @@ window.__ModuleLoader__.load({
         }
       }, [])
 
+      // A narrower window must never squeeze the reader out of existence.
+      useEffect(() => {
+        const root = rootRef.current
+        if (!root || typeof ResizeObserver === 'undefined') return undefined
+        const observer = new ResizeObserver(() => {
+          const width = root.getBoundingClientRect().width
+          setListWidth(current => {
+            const next = clampListWidth(current, width)
+            return next === current ? current : next
+          })
+        })
+        observer.observe(root)
+        return () => observer.disconnect()
+      }, [])
+
       const filtered = useMemo(() => {
         let list = entries
         if (view.kind === 'unread') list = list.filter(entry => !entry.read)
@@ -836,13 +1129,13 @@ window.__ModuleLoader__.load({
         for (const entry of ordered) {
           const key = new Date(entry.publishedAt || Date.now()).toDateString()
           if (!current || current.key !== key) {
-            current = { key, label: dayHeading(entry.publishedAt, localeId()), items: [] }
+            current = { key, label: dayHeading(entry.publishedAt, uiLocale()), items: [] }
             groups.push(current)
           }
           current.items.push(entry)
         }
         return groups
-      }, [filtered, localeId])
+      }, [filtered, preference])
 
       const selectedEntry = useMemo(
         () => entries.find(entry => entry.id === selectedId) || null,
@@ -863,11 +1156,11 @@ window.__ModuleLoader__.load({
         try {
           const result = await sendOperation('star', { ids: [entry.id], starred: !entry.starred })
           if (result.snapshot) applySnapshot(result.snapshot)
-          notify(entry.starred ? t('toast.unstarred') : t('toast.starred'))
+          notify(entry.starred ? translate('toast.unstarred') : translate('toast.starred'))
         } catch (error) {
-          notify(error instanceof Error ? error.message : t('toast.error'), 'error')
+          notify(errorText(error), 'error')
         }
-      }, [applySnapshot, notify, t])
+      }, [applySnapshot, notify])
 
       // Load the article body for the selected entry.
       useEffect(() => {
@@ -900,7 +1193,6 @@ window.__ModuleLoader__.load({
         markRead([selectedEntry.id], true)
       }, [selectedEntry, markRead])
 
-      // Selecting an entry on a narrow layout moves to the reader pane.
       const selectEntry = useCallback(entry => {
         setSelectedId(entry.id)
         if (narrow) setMobilePane('reader')
@@ -945,22 +1237,22 @@ window.__ModuleLoader__.load({
           const payload = view.kind === 'feed' && view.feedId ? { feedId: view.feedId } : {}
           const result = await sendOperation('read-all', payload)
           if (result.snapshot) applySnapshot(result.snapshot)
-          notify(fill(t('list.markAllConfirm'), { count: result.changed || 0 }))
+          notify(fill(translate('list.markAllConfirm'), { count: result.changed || 0 }))
         } catch (error) {
-          notify(error instanceof Error ? error.message : t('toast.error'), 'error')
+          notify(errorText(error), 'error')
         }
-      }, [applySnapshot, notify, t, view])
+      }, [applySnapshot, notify, view])
 
       const unsubscribe = useCallback(async feed => {
         try {
           const result = await sendOperation('unsubscribe', { feedId: feed.id })
           if (result.snapshot) applySnapshot(result.snapshot)
           if (view.kind === 'feed' && view.feedId === feed.id) setView({ kind: 'unread', feedId: '' })
-          notify(t('toast.unsubscribed'))
+          notify(translate('toast.unsubscribed'))
         } catch (error) {
-          notify(error instanceof Error ? error.message : t('toast.error'), 'error')
+          notify(errorText(error), 'error')
         }
-      }, [applySnapshot, notify, t, view])
+      }, [applySnapshot, notify, view])
 
       const subscribe = useCallback(async url => {
         setBusy(current => ({ ...current, subscribe: true }))
@@ -968,15 +1260,15 @@ window.__ModuleLoader__.load({
           const result = await sendOperation('subscribe', { url })
           if (result.snapshot) applySnapshot(result.snapshot)
           setDialog(null)
-          if (result.duplicate) notify(t('toast.alreadySubscribed'))
-          else notify(fill(t('toast.subscribed'), { title: result.title || url }))
+          if (result.duplicate) notify(translate('toast.alreadySubscribed'))
+          else notify(fill(translate('toast.subscribed'), { title: result.title || url }))
           if (result.feedId) setView({ kind: 'feed', feedId: result.feedId })
         } catch (error) {
-          throw error instanceof Error ? error : new Error(String(error))
+          throw new Error(errorText(error))
         } finally {
           setBusy(current => ({ ...current, subscribe: false }))
         }
-      }, [applySnapshot, notify, t])
+      }, [applySnapshot, notify])
 
       const importOpmlText = useCallback(async text => {
         try {
@@ -984,11 +1276,14 @@ window.__ModuleLoader__.load({
           if (result.snapshot) applySnapshot(result.snapshot)
           setDialog(null)
           const added = (result.added || []).length
-          notify(added ? fill(t('toast.imported'), { count: added }) : t('toast.importEmpty'), added ? 'info' : 'error')
+          notify(
+            added ? fill(translate('toast.imported'), { count: added }) : translate('toast.importEmpty'),
+            added ? 'info' : 'error',
+          )
         } catch (error) {
-          notify(error instanceof Error ? error.message : t('toast.error'), 'error')
+          notify(errorText(error), 'error')
         }
-      }, [applySnapshot, notify, t])
+      }, [applySnapshot, notify])
 
       const exportOpml = useCallback(async () => {
         try {
@@ -1000,22 +1295,84 @@ window.__ModuleLoader__.load({
           anchor.download = 'dsh-folo-subscriptions.opml'
           anchor.click()
           window.setTimeout(() => URL.revokeObjectURL(url), 4000)
-          notify(t('toast.exported'))
+          notify(translate('toast.exported'))
         } catch (error) {
-          notify(error instanceof Error ? error.message : t('toast.error'), 'error')
+          notify(errorText(error), 'error')
         }
-      }, [notify, t])
+      }, [notify])
 
-      const titleOfView = view.kind === 'feed'
-        ? (feedsById.get(view.feedId)?.title || t('nav.subscriptions'))
-        : view.kind === 'starred'
-          ? t('nav.starred')
-          : view.kind === 'all'
-            ? t('nav.all')
-            : t('nav.unread')
+      // --- divider dragging -------------------------------------------------
+
+      const containerWidth = () => (rootRef.current ? rootRef.current.getBoundingClientRect().width : 0)
+
+      const commitWidth = useCallback(next => {
+        listWidthRef.current = next
+        setListWidth(next)
+        updateSettings({ listWidth: next })
+      }, [updateSettings])
+
+      const onSplitterDown = event => {
+        if (event.button !== 0) return
+        event.preventDefault()
+        dragRef.current = { startX: event.clientX, startWidth: listWidthRef.current }
+        setDragging(true)
+        event.currentTarget.setPointerCapture?.(event.pointerId)
+      }
+
+      const onSplitterMove = event => {
+        const drag = dragRef.current
+        if (!drag) return
+        const next = clampListWidth(drag.startWidth + (event.clientX - drag.startX), containerWidth())
+        if (next === listWidthRef.current) return
+        listWidthRef.current = next
+        setListWidth(next)
+      }
+
+      const onSplitterUp = event => {
+        if (!dragRef.current) return
+        dragRef.current = null
+        setDragging(false)
+        event.currentTarget.releasePointerCapture?.(event.pointerId)
+        updateSettings({ listWidth: listWidthRef.current })
+      }
+
+      const onSplitterKey = event => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+        event.preventDefault()
+        const delta = (event.key === 'ArrowRight' ? 1 : -1) * (event.shiftKey ? 48 : 16)
+        commitWidth(clampListWidth(listWidthRef.current + delta, containerWidth()))
+      }
+
+      // --- subscription menu ------------------------------------------------
+
+      useEffect(() => {
+        if (!menuOpen) return undefined
+        const onDown = event => {
+          const insideMenu = menuRef.current && menuRef.current.contains(event.target)
+          const onButton = event.target && event.target.closest && event.target.closest('.folo-feedbtn')
+          if (!insideMenu && !onButton) setMenuOpen(false)
+        }
+        const onKey = event => {
+          if (event.key === 'Escape') setMenuOpen(false)
+        }
+        document.addEventListener('pointerdown', onDown, true)
+        document.addEventListener('keydown', onKey)
+        return () => {
+          document.removeEventListener('pointerdown', onDown, true)
+          document.removeEventListener('keydown', onKey)
+        }
+      }, [menuOpen])
 
       const unreadTotal = snapshot?.stats?.unread || 0
       const starredTotal = snapshot?.stats?.starred || 0
+
+      const titleOfView = view.kind === 'feed'
+        ? (feedsById.get(view.feedId)?.title || translate('nav.subscriptions'))
+        : view.kind === 'starred'
+          ? translate('nav.starred')
+          : view.kind === 'all'
+            ? translate('nav.all')
+            : translate('nav.unread')
 
       // --- header -----------------------------------------------------------
 
@@ -1027,147 +1384,189 @@ window.__ModuleLoader__.load({
         h('div', { className: 'folo-brand' },
           h('span', { className: 'folo-brand-mark' }, h(Icons.rss, { size: 15 })),
           h('span', { className: 'folo-brand-text' },
-            h('span', { className: 'folo-brand-title' }, t('panel.title')),
+            h('span', { className: 'folo-brand-title' }, translate('panel.title')),
             h('span', { className: 'folo-brand-sub' }, snapshot
-              ? `${snapshot.stats.feeds} ${t('nav.subscriptions')} · ${unreadTotal} ${t('nav.unread')}`
-              : t('panel.subtitle')))),
+              ? `${snapshot.stats.feeds} ${translate('nav.subscriptions')} · ${unreadTotal} ${translate('nav.unread')}`
+              : translate('panel.subtitle')))),
         h('div', { className: 'folo-header-main' },
           h('label', { className: 'folo-search' },
             h(Icons.search, { size: 14 }),
             h('input', {
               value: query,
               onChange: event => setQuery(event.target.value),
-              placeholder: t('action.search'),
-              'aria-label': t('action.search'),
+              placeholder: translate('action.search'),
+              'aria-label': translate('action.search'),
               spellCheck: false,
             }),
             query
               ? h('button', {
                 type: 'button',
                 className: 'folo-search-clear',
-                title: t('action.clearSearch'),
+                title: translate('action.clearSearch'),
                 onClick: () => setQuery(''),
               }, h(Icons.close, { size: 12 }))
               : null),
           h('button', {
             type: 'button',
             className: 'folo-iconbtn',
-            title: t('action.refresh'),
-            'aria-label': t('action.refresh'),
+            title: translate('action.refresh'),
+            'aria-label': translate('action.refresh'),
             disabled: busy.refresh || !feeds.length,
             onClick: () => refresh(),
           }, h(Icons.refresh, { size: 15, className: busy.refresh ? 'folo-spin' : undefined })),
           h('button', {
             type: 'button',
+            className: 'folo-iconbtn',
+            title: translate('action.settings'),
+            'aria-label': translate('action.settings'),
+            onClick: () => setDialog('settings'),
+          }, h(Icons.gear, { size: 15 })),
+          h('button', {
+            type: 'button',
             className: 'folo-btn folo-btn-primary',
             onClick: () => setDialog('add'),
-          }, h(Icons.plus, { size: 14 }), t('nav.addFeed'))))
+          }, h(Icons.plus, { size: 14 }), translate('nav.addFeed'))))
 
-      // --- navigation -------------------------------------------------------
+      // --- toolbar: view tabs and the subscription picker --------------------
 
-      const navRow = (kind, icon, label, count, feedId) => h('button', {
-        key: `${kind}:${feedId || ''}`,
+      const tab = (kind, label, count) => h('button', {
+        key: kind,
         type: 'button',
-        className: `folo-nav-row${view.kind === kind && (kind !== 'feed' || view.feedId === feedId) ? ' is-active' : ''}`,
+        className: `folo-tab${view.kind === kind ? ' is-active' : ''}`,
+        'aria-pressed': view.kind === kind,
         onClick: () => {
-          setView({ kind, feedId: feedId || '' })
-          if (narrow) setMobilePane('list')
+          setView({ kind, feedId: '' })
+          setMobilePane('list')
         },
       },
-        h('span', { className: 'folo-nav-row-icon' }, h(icon, { size: 15 })),
-        h('span', { className: 'folo-nav-row-text' }, label),
+        h('span', null, label),
+        count ? h('span', { className: 'folo-tab-count' }, count) : null)
+
+      const activeFeed = view.kind === 'feed' ? feedsById.get(view.feedId) : null
+      const feedButtonLabel = activeFeed ? activeFeed.title : translate('toolbar.allFeeds')
+
+      const menuRow = (key, icon, label, count, active, onSelect, trailing) => h('div', {
+        key,
+        className: `folo-menu-row${active ? ' is-active' : ''}`,
+        role: 'button',
+        tabIndex: 0,
+        onClick: onSelect,
+        onKeyDown: event => {
+          if (event.key !== 'Enter' && event.key !== ' ') return
+          event.preventDefault()
+          onSelect()
+        },
+      },
+        icon ? h('span', { className: 'folo-nav-row-icon' }, h(icon, { size: 15 })) : null,
+        h('span', { className: 'folo-feedbtn-name' }, label),
+        trailing || null,
         h(Count, { value: count }))
 
-      const navigation = h('nav', { className: 'folo-nav', 'aria-label': t('nav.inbox') },
-        h('div', { className: 'folo-nav-head' }, h('span', { className: 'folo-nav-label' }, t('nav.inbox'))),
-        h('div', { className: 'folo-nav-group' },
-          navRow('unread', Icons.inbox, t('nav.unread'), unreadTotal),
-          navRow('all', Icons.library, t('nav.all'), 0),
-          navRow('starred', Icons.star, t('nav.starred'), starredTotal)),
-        h('div', { className: 'folo-nav-head' },
-          h('span', { className: 'folo-nav-label' }, t('nav.subscriptions')),
-          h('button', {
-            type: 'button',
-            className: 'folo-iconbtn',
-            title: t('nav.addFeed'),
-            onClick: () => setDialog('add'),
-            style: { width: 22, height: 22 },
-          }, h(Icons.plus, { size: 13 }))),
-        h('div', { className: 'folo-nav-group folo-scroll', style: { flex: 1, paddingBottom: 12 } },
-          feeds.length === 0
-            ? h('div', { style: { padding: '6px 8px', fontSize: 11.5, color: 'var(--dsw-alias-label-secondary)' } }, t('nav.empty'))
-            : feeds.map(feed => h('div', {
-              key: feed.id,
-              className: `folo-feed-row${view.kind === 'feed' && view.feedId === feed.id ? ' is-active' : ''}`,
-              role: 'button',
-              tabIndex: 0,
-              onClick: () => {
-                setView({ kind: 'feed', feedId: feed.id })
-                if (narrow) setMobilePane('list')
+      const subscriptionMenu = menuOpen
+        ? h('div', { className: 'folo-menu', ref: menuRef, role: 'menu', 'aria-label': translate('action.feeds') },
+          h('div', { className: 'folo-menu-label' }, translate('nav.subscriptions')),
+          h('div', { className: 'folo-menu-scroll' },
+            menuRow(
+              'all',
+              Icons.library,
+              translate('toolbar.allFeeds'),
+              unreadTotal,
+              view.kind === 'all' || view.kind === 'unread' || view.kind === 'starred',
+              () => {
+                setView({ kind: 'unread', feedId: '' })
+                setMenuOpen(false)
               },
-              onKeyDown: event => {
-                if (event.key !== 'Enter' && event.key !== ' ') return
-                event.preventDefault()
-                setView({ kind: 'feed', feedId: feed.id })
-                if (narrow) setMobilePane('list')
-              },
-            },
-              h(FeedBadge, { id: feed.id, title: feed.title }),
-              h('span', { className: 'folo-feed-name', title: feed.error ? fill(t('state.feedError'), { message: feed.error }) : feed.title }, feed.title),
-              feed.error
-                ? h('span', { className: 'folo-feed-action folo-feed-error', title: fill(t('state.feedError'), { message: feed.error }) }, h(Icons.dot, { size: 11 }))
-                : null,
-              h('span', { className: 'folo-feed-actions' },
-                h('button', {
-                  type: 'button',
-                  className: 'folo-feed-action',
-                  title: t('action.refresh'),
-                  onClick: event => {
-                    event.stopPropagation()
-                    refresh({ feedIds: [feed.id] })
-                  },
-                }, h(Icons.refresh, { size: 12 })),
-                h('button', {
-                  type: 'button',
-                  className: 'folo-feed-action',
-                  title: t('action.unsubscribe'),
-                  onClick: event => {
-                    event.stopPropagation()
-                    unsubscribe(feed)
-                  },
-                }, h(Icons.trash, { size: 12 }))),
-              h(Count, { value: feed.unread })))),
-        h('div', { className: 'folo-nav-foot' },
-          h('button', {
-            type: 'button',
-            className: 'folo-iconbtn',
-            title: t('nav.importOpml'),
-            onClick: () => setDialog('import'),
-          }, h(Icons.upload, { size: 15 })),
-          h('button', {
-            type: 'button',
-            className: 'folo-iconbtn',
-            title: t('nav.exportOpml'),
-            onClick: exportOpml,
-            disabled: !feeds.length,
-          }, h(Icons.download, { size: 15 })),
-          h('span', { style: { flex: 1 } }),
+            ),
+            feeds.length === 0
+              ? h('div', {
+                className: 'folo-menu-label',
+                style: { textTransform: 'none', letterSpacing: 0, fontWeight: 400 },
+              }, translate('nav.empty'))
+              : feeds.map(feed => menuRow(
+                feed.id,
+                () => h(FeedBadge, { id: feed.id, title: feed.title, size: 15 }),
+                feed.title,
+                feed.unread,
+                view.kind === 'feed' && view.feedId === feed.id,
+                () => {
+                  setView({ kind: 'feed', feedId: feed.id })
+                  setMenuOpen(false)
+                },
+                h('span', { className: 'folo-feed-actions', style: { display: 'flex' } },
+                  feed.error
+                    ? h('span', { className: 'folo-feed-action folo-feed-error', title: translate(`error.${feed.errorCode || 'unknown'}`) }, h(Icons.dot, { size: 11 }))
+                    : null,
+                  h('button', {
+                    type: 'button',
+                    className: 'folo-feed-action',
+                    title: translate('action.refresh'),
+                    onClick: event => {
+                      event.stopPropagation()
+                      refresh({ feedIds: [feed.id] })
+                    },
+                  }, h(Icons.refresh, { size: 12 })),
+                  h('button', {
+                    type: 'button',
+                    className: 'folo-feed-action',
+                    title: translate('action.unsubscribe'),
+                    onClick: event => {
+                      event.stopPropagation()
+                      unsubscribe(feed)
+                    },
+                  }, h(Icons.trash, { size: 12 })))))),
+          h('div', { className: 'folo-menu-sep' }),
+          h('div', { className: 'folo-menu-actions' },
+            menuRow('add', Icons.plus, translate('nav.addFeed'), 0, false, () => {
+              setMenuOpen(false)
+              setDialog('add')
+            }),
+            menuRow('import', Icons.upload, translate('nav.importOpml'), 0, false, () => {
+              setMenuOpen(false)
+              setDialog('import')
+            }),
+            menuRow('export', Icons.download, translate('nav.exportOpml'), 0, false, () => {
+              setMenuOpen(false)
+              exportOpml()
+            })),
           snapshot?.stats?.lastFetchedAt
-            ? h('span', { style: { fontSize: 10.5, color: 'var(--dsw-alias-label-secondary)' } },
-              fill(t('state.updated'), { when: relativeTime(snapshot.stats.lastFetchedAt, localeId()) }))
-            : null))
+            ? h('div', {
+              className: 'folo-menu-label',
+              style: { textTransform: 'none', letterSpacing: 0, fontWeight: 400, paddingTop: 4 },
+            }, fill(translate('state.updated'), { when: relativeTime(snapshot.stats.lastFetchedAt, uiLocale()) }))
+            : null)
+        : null
+
+      const toolbar = h('div', { className: 'folo-toolbar' },
+        h('div', { className: 'folo-tabs' },
+          tab('unread', translate('nav.unread'), unreadTotal),
+          tab('all', translate('nav.all'), 0),
+          tab('starred', translate('nav.starred'), starredTotal)),
+        h('button', {
+          type: 'button',
+          className: 'folo-feedbtn',
+          title: translate('action.feeds'),
+          'aria-expanded': menuOpen,
+          'aria-haspopup': 'menu',
+          onClick: () => setMenuOpen(open => !open),
+        },
+          activeFeed
+            ? h(FeedBadge, { id: activeFeed.id, title: activeFeed.title, size: 15 })
+            : h(Icons.inbox, { size: 14 }),
+          h('span', { className: 'folo-feedbtn-name' }, feedButtonLabel),
+          h(Icons.chevron, { size: 13 })),
+        subscriptionMenu)
 
       // --- entry list -------------------------------------------------------
 
       const listHead = h('div', { className: 'folo-list-head' },
         h('div', { style: { minWidth: 0 } },
           h('div', { className: 'folo-list-title' }, titleOfView),
-          h('div', { className: 'folo-list-meta' }, fill(t('list.count'), { count: filtered.length }))),
+          h('div', { className: 'folo-list-meta' }, fill(translate('list.count'), { count: filtered.length }))),
         h('button', {
           type: 'button',
           className: 'folo-iconbtn',
-          title: t('action.markAllRead'),
-          'aria-label': t('action.markAllRead'),
+          title: translate('action.markAllRead'),
+          'aria-label': translate('action.markAllRead'),
           disabled: !entries.some(entry => !entry.read && (view.kind !== 'feed' || entry.feedId === view.feedId)),
           onClick: markAllRead,
         }, h(Icons.check, { size: 15 })))
@@ -1176,18 +1575,18 @@ window.__ModuleLoader__.load({
       const listEmpty = feeds.length === 0
         ? h(EmptyState, {
           icon: Icons.rss,
-          title: t('list.noFeeds'),
-          hint: t('list.noFeedsHint'),
+          title: translate('list.noFeeds'),
+          hint: translate('list.noFeedsHint'),
           action: h('button', {
             type: 'button',
             className: 'folo-btn folo-btn-primary',
             style: { marginTop: 4 },
             onClick: () => setDialog('add'),
-          }, h(Icons.plus, { size: 13 }), t('action.addFirstFeed')),
+          }, h(Icons.plus, { size: 13 }), translate('action.addFirstFeed')),
         })
         : query.trim()
-          ? h(EmptyState, { icon: Icons.search, title: t('list.noMatch'), hint: t('list.noMatchHint') })
-          : h(EmptyState, { icon: Icons.inbox, title: t('list.empty'), hint: t('list.emptyHint') })
+          ? h(EmptyState, { icon: Icons.search, title: translate('list.noMatch'), hint: translate('list.noMatchHint') })
+          : h(EmptyState, { icon: Icons.inbox, title: translate('list.empty'), hint: translate('list.emptyHint') })
 
       const entryRow = entry => {
         const feed = feedsById.get(entry.feedId)
@@ -1212,7 +1611,7 @@ window.__ModuleLoader__.load({
             !entry.read ? h('span', { className: 'folo-item-unread', 'aria-hidden': 'true' }) : null,
             h('span', { className: 'folo-item-feed' }, feed ? feed.title : ''),
             h('span', { className: 'folo-item-sep' }, '·'),
-            h('span', null, relativeTime(entry.publishedAt, localeId()))),
+            h('span', null, relativeTime(entry.publishedAt, uiLocale()))),
           h('div', { className: 'folo-item-body' },
             h('div', { className: 'folo-item-text' },
               h('div', { className: 'folo-item-title' }, entry.title),
@@ -1233,7 +1632,7 @@ window.__ModuleLoader__.load({
           h('button', {
             type: 'button',
             className: 'folo-item-star',
-            title: entry.starred ? t('action.unstar') : t('action.star'),
+            title: entry.starred ? translate('action.unstar') : translate('action.star'),
             'aria-pressed': entry.starred,
             onClick: event => {
               event.stopPropagation()
@@ -1242,14 +1641,12 @@ window.__ModuleLoader__.load({
           }, h(StarGlyph, { filled: entry.starred, size: 13 })))
       }
 
-      const list = h('section', { className: 'folo-list', 'aria-label': titleOfView },
-        listHead,
-        h('div', { className: 'folo-scroll' },
-          showListEmpty
-            ? listEmpty
-            : grouped.map(group => h('div', { key: group.key },
-              h('div', { className: 'folo-day' }, group.label),
-              group.items.map(entryRow)))))
+      const listScroll = h('div', { className: 'folo-scroll' },
+        showListEmpty
+          ? listEmpty
+          : grouped.map(group => h('div', { key: group.key },
+            h('div', { className: 'folo-day' }, group.label),
+            group.items.map(entryRow))))
 
       // --- reader -----------------------------------------------------------
 
@@ -1258,7 +1655,7 @@ window.__ModuleLoader__.load({
           h('button', {
             type: 'button',
             className: `folo-iconbtn${selectedEntry.starred ? ' is-on' : ''}`,
-            title: selectedEntry.starred ? t('action.unstar') : t('action.star'),
+            title: selectedEntry.starred ? translate('action.unstar') : translate('action.star'),
             'aria-pressed': selectedEntry.starred,
             onClick: () => toggleStar(selectedEntry),
             style: selectedEntry.starred ? { color: 'var(--dsw-alias-state-warn-primary)' } : undefined,
@@ -1266,14 +1663,14 @@ window.__ModuleLoader__.load({
           h('button', {
             type: 'button',
             className: 'folo-iconbtn',
-            title: selectedEntry.read ? t('action.markUnread') : t('action.markRead'),
+            title: selectedEntry.read ? translate('action.markUnread') : translate('action.markRead'),
             onClick: () => markRead([selectedEntry.id], !selectedEntry.read),
           }, h(Icons.mail, { size: 15 })),
           selectedEntry.link
             ? h('button', {
               type: 'button',
               className: 'folo-iconbtn',
-              title: t('action.openOriginal'),
+              title: translate('action.openOriginal'),
               onClick: () => window.open(selectedEntry.link, '_blank', 'noopener,noreferrer'),
             }, h(Icons.external, { size: 15 }))
             : null)
@@ -1284,22 +1681,22 @@ window.__ModuleLoader__.load({
           ? h('button', {
             type: 'button',
             className: 'folo-iconbtn',
-            title: t('action.back'),
+            title: translate('action.back'),
             onClick: () => setMobilePane('list'),
           }, h(Icons.back, { size: 16 }))
           : null,
-        h('span', { className: 'folo-list-meta' }, selectedEntry ? relativeTime(selectedEntry.publishedAt, localeId()) : ''),
+        h('span', { className: 'folo-list-meta' }, selectedEntry ? relativeTime(selectedEntry.publishedAt, uiLocale()) : ''),
         readerActions)
 
       const articleBody = (() => {
         if (!selectedEntry) {
-          return h(EmptyState, { icon: Icons.rss, title: t('reader.empty'), hint: t('reader.emptyHint') })
+          return h(EmptyState, { icon: Icons.rss, title: translate('reader.empty'), hint: translate('reader.emptyHint') })
         }
         if (articleState === 'loading') {
-          return h(EmptyState, { icon: Icons.refresh, title: t('reader.loading') })
+          return h(EmptyState, { icon: Icons.refresh, title: translate('reader.loading') })
         }
         if (articleState === 'error') {
-          return h(EmptyState, { icon: Icons.close, title: t('reader.error') })
+          return h(EmptyState, { icon: Icons.close, title: translate('reader.error') })
         }
         const feed = feedsById.get(selectedEntry.feedId)
         return h('div', { className: 'folo-scroll' },
@@ -1310,14 +1707,14 @@ window.__ModuleLoader__.load({
                 h(FeedBadge, { id: selectedEntry.feedId, title: feed ? feed.title : '', size: 15 }),
                 feed ? feed.title : ''),
               h('span', { className: 'folo-article-sep' }, '·'),
-              h('span', null, new Date(selectedEntry.publishedAt || Date.now()).toLocaleString(localeId(), {
+              h('span', null, new Date(selectedEntry.publishedAt || Date.now()).toLocaleString(uiLocale(), {
                 year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
               })),
               selectedEntry.author
                 ? h('span', { className: 'folo-article-sep' }, '·')
                 : null,
               selectedEntry.author
-                ? h('span', null, fill(t('reader.byAuthor'), { author: selectedEntry.author }))
+                ? h('span', null, fill(translate('reader.byAuthor'), { author: selectedEntry.author }))
                 : null),
             article && article.html
               ? h('div', {
@@ -1325,47 +1722,67 @@ window.__ModuleLoader__.load({
                 dangerouslySetInnerHTML: { __html: article.html },
               })
               : h('div', { className: 'folo-empty-hint', style: { fontSize: 13 } },
-                t('reader.noContent'),
+                translate('reader.noContent'),
                 selectedEntry.link
                   ? h('div', { style: { marginTop: 10 } },
                     h('button', {
                       type: 'button',
                       className: 'folo-btn',
                       onClick: () => window.open(selectedEntry.link, '_blank', 'noopener,noreferrer'),
-                    }, h(Icons.external, { size: 13 }), t('action.openOriginal')))
+                    }, h(Icons.external, { size: 13 }), translate('action.openOriginal')))
                   : null)))
       })()
 
       const reader = h('section', {
-        className: `folo-reader${narrow && mobilePane !== 'reader' ? ' is-hidden' : ''}`,
-        'aria-label': t('panel.subtitle'),
+        className: 'folo-reader',
+        'aria-label': translate('panel.subtitle'),
       },
-        narrow
-          ? h('div', { className: 'folo-reader-head' },
-            h('button', {
-              type: 'button',
-              className: 'folo-btn folo-btn-ghost',
-              onClick: () => setMobilePane('list'),
-            }, h(Icons.back, { size: 15 }), t('action.back')),
-            h('span', { style: { flex: 1 } }),
-            readerActions)
-          : readerHead,
+        readerHead,
         articleBody)
+
+      // --- divider ----------------------------------------------------------
+
+      const splitter = narrow
+        ? null
+        : h('div', {
+          className: `folo-splitter${dragging ? ' is-active' : ''}`,
+          role: 'separator',
+          'aria-orientation': 'vertical',
+          'aria-label': translate('splitter.label'),
+          'aria-valuenow': listWidth,
+          'aria-valuemin': MIN_LIST_WIDTH,
+          'aria-valuemax': MAX_LIST_WIDTH,
+          tabIndex: 0,
+          title: translate('splitter.hint'),
+          onPointerDown: onSplitterDown,
+          onPointerMove: onSplitterMove,
+          onPointerUp: onSplitterUp,
+          onPointerCancel: onSplitterUp,
+          onKeyDown: onSplitterKey,
+        })
 
       // --- overlays ---------------------------------------------------------
 
       return h('div', {
-        className: 'folo-root',
+        className: `folo-root${dragging ? ' is-dragging' : ''}`,
         ref: rootRef,
         tabIndex: -1,
         onKeyDown,
       },
         h('style', null, STYLES),
         header,
-        h('div', { className: 'folo-body' }, navigation, list, reader),
+        h('div', { className: 'folo-body' },
+          narrow && mobilePane === 'reader'
+            ? null
+            : h('div', {
+              className: 'folo-listcol',
+              style: narrow ? { width: '100%' } : { width: listWidth },
+            }, toolbar, listHead, listScroll),
+          splitter,
+          narrow && mobilePane !== 'reader' ? null : reader),
         dialog === 'add'
           ? h(AddFeedDialog, {
-            t,
+            t: translate,
             busy: busy.subscribe,
             onCancel: () => setDialog(null),
             onSubmit: subscribe,
@@ -1373,9 +1790,16 @@ window.__ModuleLoader__.load({
           : null,
         dialog === 'import'
           ? h(ImportDialog, {
-            t,
+            t: translate,
             onCancel: () => setDialog(null),
             onText: importOpmlText,
+          })
+          : null,
+        dialog === 'settings'
+          ? h(SettingsDialog, {
+            locale: preference.locale,
+            onChange: value => updateSettings({ locale: value }),
+            onClose: () => setDialog(null),
           })
           : null,
         toast
@@ -1393,7 +1817,7 @@ window.__ModuleLoader__.load({
               className: 'folo-btn folo-btn-ghost',
               style: { height: 22, padding: '0 8px' },
               onClick: load,
-            }, t('action.retry')))
+            }, translate('action.retry')))
           : null)
     }
 
@@ -1508,7 +1932,7 @@ window.__ModuleLoader__.load({
     // Sidebar entry
     // -----------------------------------------------------------------------
 
-    function SidebarIcon({ size, env }) {
+    function SidebarIcon({ size }) {
       const unread = useSyncExternalStore(unreadCounter.subscribe, unreadCounter.get, unreadCounter.get)
       const dimension = typeof size === 'number' ? size : 20
       return h('span', {
@@ -1520,7 +1944,7 @@ window.__ModuleLoader__.load({
           width: dimension,
           height: dimension,
         },
-        title: unread ? fill(env.t('state.unreadBadge'), { count: unread }) : env.t('panel.title'),
+        title: unread ? fill(translate('state.unreadBadge'), { count: unread }) : translate('panel.title'),
       },
         h(Icons.rss, { size: Math.round(dimension * 0.86) }),
         unread
@@ -1548,16 +1972,14 @@ window.__ModuleLoader__.load({
       name: NAMESPACE,
       inject: ['slots', 'locale'],
       apply(ctx) {
-        const translate = ctx.locale.bind(NAMESPACE)
-        const env = {
-          t: translate,
-          localeId: () => {
-            try {
-              return ctx.locale.getLocale().active || 'en'
-            } catch {
-              return 'en'
-            }
-          },
+        // The reader defaults to Chinese and can follow the Harness instead;
+        // `auto` needs the live Harness locale, so read it lazily.
+        harnessLocale = () => {
+          try {
+            return ctx.locale.getLocale().active || 'en'
+          } catch {
+            return 'en'
+          }
         }
 
         for (const [localeKey, dictionary] of Object.entries(DICTIONARIES)) {
@@ -1571,7 +1993,7 @@ window.__ModuleLoader__.load({
           name: 'main',
           key: PANEL_KEY,
           locale: NAMESPACE,
-        }, props => h(Panel, { ...props, env })))
+        }, Panel))
 
         ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
           name: 'sidebar.panellist',
@@ -1579,7 +2001,7 @@ window.__ModuleLoader__.load({
           order: 15,
           label: () => translate('panel.title'),
           locale: NAMESPACE,
-        }, props => h(SidebarIcon, { size: props.size, env })))
+        }, SidebarIcon))
       },
     }
   },

@@ -37,13 +37,28 @@ let state = null
 let loading = null
 let writeQueue = Promise.resolve()
 
+const LOCALES = ['auto', 'zh', 'en']
+
+function defaultSettings() {
+  return { locale: 'zh', listWidth: 0 }
+}
+
+function normalizeSettings(raw) {
+  const next = defaultSettings()
+  if (!raw || typeof raw !== 'object') return next
+  if (LOCALES.includes(raw.locale)) next.locale = raw.locale
+  if (Number.isFinite(raw.listWidth) && raw.listWidth > 0) next.listWidth = Math.round(raw.listWidth)
+  return next
+}
+
 function emptyState() {
-  return { version: STORE_VERSION, feeds: [], entries: [] }
+  return { version: STORE_VERSION, settings: defaultSettings(), feeds: [], entries: [] }
 }
 
 function normalizeState(raw) {
   const next = emptyState()
   if (!raw || typeof raw !== 'object') return next
+  next.settings = normalizeSettings(raw.settings)
   if (Array.isArray(raw.feeds)) next.feeds = raw.feeds.filter(feed => feed && typeof feed.id === 'string')
   if (Array.isArray(raw.entries)) {
     next.entries = raw.entries.filter(entry => entry && typeof entry.id === 'string')
@@ -592,6 +607,32 @@ async function readFeed(url) {
   return { ...parsed, resolvedUrl, etag: document.etag, lastModified: document.lastModified }
 }
 
+// Every failure carries a stable code so the panel can render a localized
+// message instead of the raw English text from the fetch layer.
+function errorCode(message) {
+  const text = String(message || '')
+  if (/not a valid URL/i.test(text)) return 'invalid_url'
+  if (/Feed URL is required/i.test(text)) return 'url_required'
+  if (/Only http and https/i.test(text)) return 'unsupported_protocol'
+  if (/No RSS or Atom feed/i.test(text)) return 'no_feed'
+  if (/^HTTP \d+/i.test(text)) return 'http_status'
+  if (/too large/i.test(text)) return 'too_large'
+  if (/[Ee]mpty feed document/.test(text)) return 'empty_feed'
+  if (/OPML file is empty/i.test(text)) return 'empty_opml'
+  if (/title is required/i.test(text)) return 'title_required'
+  if (/entry not found/i.test(text)) return 'entry_not_found'
+  if (/unknown operation/i.test(text)) return 'unknown_operation'
+  if (/cross-site|origin mismatch/i.test(text)) return 'forbidden'
+  if (/invalid json|malformed/i.test(text)) return 'bad_json'
+  if (/invalid locale|invalid list width/i.test(text)) return 'invalid_setting'
+  if (/fetch failed|network|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|socket hang up|getaddrinfo/i.test(text)) return 'unreachable'
+  return 'unknown'
+}
+
+function fail(response, status, message) {
+  sendJson(response, status, { ok: false, code: errorCode(message), error: message })
+}
+
 function sendJson(response, status, value) {
   const body = Buffer.from(JSON.stringify(value))
   response.writeHead(status, {
@@ -635,23 +676,23 @@ function headerOf(request, name) {
 function allowRequest(request, response) {
   const site = headerOf(request, 'sec-fetch-site').toLowerCase()
   if (site === 'cross-site') {
-    sendJson(response, 403, { ok: false, error: 'cross-site request refused' })
+    fail(response, 403, 'cross-site request refused')
     return false
   }
   const origin = headerOf(request, 'origin').trim()
   if (!origin) return true
   if (origin === 'null') {
-    sendJson(response, 403, { ok: false, error: 'cross-site request refused' })
+    fail(response, 403, 'cross-site request refused')
     return false
   }
   try {
     const host = headerOf(request, 'host').trim().toLowerCase()
     if (!host || new URL(origin).host.toLowerCase() !== host) {
-      sendJson(response, 403, { ok: false, error: 'origin mismatch' })
+      fail(response, 403, 'origin mismatch')
       return false
     }
   } catch {
-    sendJson(response, 403, { ok: false, error: 'origin mismatch' })
+    fail(response, 403, 'origin mismatch')
     return false
   }
   return true
@@ -682,6 +723,7 @@ function publicFeed(feed, entries) {
     siteUrl: feed.siteUrl || '',
     description: feed.description || '',
     error: feed.error || '',
+    errorCode: feed.error ? errorCode(feed.error) : '',
     addedAt: feed.addedAt,
     lastFetchedAt: feed.lastFetchedAt || 0,
     unread: own.filter(entry => !entry.read).length,
@@ -723,6 +765,7 @@ function buildSnapshot() {
     ok: true,
     platform: process.platform,
     desktop: Boolean(process.versions.electron),
+    settings: state.settings,
     feeds: feeds.map(feed => publicFeed(feed, entries)),
     entries: entries.map(publicEntry),
     stats: {
@@ -863,9 +906,11 @@ async function refreshFeeds(ids) {
 function normalizeFeedUrl(input) {
   const raw = String(input || '').trim()
   if (!raw) throw new Error('Feed URL is required')
+  // An explicit non-http scheme is a mistake to report, not a host to guess at.
+  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw)
   let url
   try {
-    url = new URL(raw.startsWith('http') ? raw : `https://${raw}`).toString()
+    url = new URL(hasScheme ? raw : `https://${raw}`).toString()
   } catch {
     throw new Error('That is not a valid URL')
   }
@@ -991,7 +1036,7 @@ async function handleRequest(request, response) {
       await loadState()
       const entry = findEntry(url.searchParams.get('id') || '')
       if (!entry) {
-        sendJson(response, 404, { ok: false, error: 'entry not found' })
+        fail(response, 404, 'entry not found')
         return
       }
       sendJson(response, 200, {
@@ -1002,7 +1047,7 @@ async function handleRequest(request, response) {
     }
 
     if (method !== 'POST') {
-      sendJson(response, 405, { ok: false, error: 'method not allowed' })
+      fail(response, 405, 'method not allowed')
       return
     }
 
@@ -1020,13 +1065,17 @@ async function handleRequest(request, response) {
         try {
           normalizeFeedUrl(body.url)
         } catch (error) {
-          sendJson(response, 400, {
-            ok: false,
-            error: error instanceof Error ? error.message : String(error),
-          })
+          fail(response, 400, error instanceof Error ? error.message : String(error))
           return
         }
-        const result = await mutate(async () => addFeed(body.url))
+        let result
+        try {
+          result = await mutate(async () => addFeed(body.url))
+        } catch (error) {
+          // A feed host that refuses to answer is a gateway problem, not a bug.
+          fail(response, 502, error instanceof Error ? error.message : String(error))
+          return
+        }
         sendJson(response, 200, { ...result, snapshot: buildSnapshot() })
         return
       }
@@ -1070,7 +1119,7 @@ async function handleRequest(request, response) {
         const feedId = String(body.feedId || '')
         const title = String(body.title || '').trim()
         if (!title) {
-          sendJson(response, 400, { ok: false, error: 'title is required' })
+          fail(response, 400, 'title is required')
           return
         }
         await mutate(async () => {
@@ -1084,7 +1133,7 @@ async function handleRequest(request, response) {
       case '/opml-import': {
         const text = String(body.text || '')
         if (!text.trim()) {
-          sendJson(response, 400, { ok: false, error: 'The OPML file is empty' })
+          fail(response, 400, 'The OPML file is empty')
           return
         }
         const urls = importOpml(text)
@@ -1111,14 +1160,35 @@ async function handleRequest(request, response) {
         return
       }
 
+      case '/settings': {
+        const patch = {}
+        if (body.locale !== undefined) {
+          if (!LOCALES.includes(body.locale)) {
+            fail(response, 400, 'invalid locale')
+            return
+          }
+          patch.locale = body.locale
+        }
+        if (body.listWidth !== undefined) {
+          if (!Number.isFinite(body.listWidth) || body.listWidth <= 0) {
+            fail(response, 400, 'invalid list width')
+            return
+          }
+          patch.listWidth = Math.round(Math.min(900, Math.max(180, body.listWidth)))
+        }
+        const settings = await mutate(async () => {
+          state.settings = normalizeSettings({ ...state.settings, ...patch })
+          return { ...state.settings }
+        })
+        sendJson(response, 200, { ok: true, settings })
+        return
+      }
+
       default:
-        sendJson(response, 404, { ok: false, error: 'unknown operation' })
+        fail(response, 404, 'unknown operation')
     }
   } catch (error) {
-    sendJson(response, 500, {
-      ok: false,
-      error: error instanceof Error ? error.message : String(error),
-    })
+    fail(response, 500, error instanceof Error ? error.message : String(error))
   }
 }
 

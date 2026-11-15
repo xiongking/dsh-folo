@@ -1,11 +1,18 @@
 {
   "meta": {
     "title": "Folo 订阅阅读器",
-    "description": "订阅 RSS 与 Atom 源，用三栏阅读视图阅读，并在侧边栏保留未读与收藏状态。"
+    "description": "订阅 RSS 与 Atom 源，在双栏阅读视图里阅读，并在侧边栏保留未读与收藏状态。"
   },
   "panel": {
     "title": "Folo",
     "subtitle": "订阅阅读器"
+  },
+  "toolbar": {
+    "allFeeds": "全部订阅源"
+  },
+  "splitter": {
+    "label": "调整列表宽度",
+    "hint": "拖动或使用方向键改变列表宽度。"
   },
   "nav": {
     "inbox": "收件箱",
@@ -36,7 +43,9 @@
     "markUnread": "标为未读",
     "back": "返回列表",
     "addFirstFeed": "添加第一个订阅",
-    "retry": "重试"
+    "retry": "重试",
+    "settings": "阅读设置",
+    "feeds": "选择订阅源"
   },
   "list": {
     "empty": "这里还没有内容",
@@ -84,5 +93,31 @@
     "feedError": "上次抓取失败：{message}",
     "neverFetched": "尚未抓取",
     "updated": "更新于 {when}"
+  },
+  "settings": {
+    "title": "阅读设置",
+    "language": "界面语言",
+    "languageHint": "只影响这个阅读器的界面文案，DeepSeek 其余部分保持原语言。",
+    "auto": "跟随 DeepSeek",
+    "zh": "简体中文",
+    "en": "English"
+  },
+  "error": {
+    "invalid_url": "这不是一个有效的网址。",
+    "url_required": "请先填写订阅源地址。",
+    "unsupported_protocol": "只支持 http 与 https 订阅源。",
+    "no_feed": "这个地址上没有找到 RSS 或 Atom 订阅源。",
+    "http_status": "订阅源服务器返回了错误。",
+    "too_large": "这个订阅源太大，无法加载。",
+    "empty_feed": "这个订阅源文档里没有内容。",
+    "empty_opml": "OPML 文件是空的。",
+    "title_required": "订阅源标题不能为空。",
+    "entry_not_found": "这篇文章已经不存在了。",
+    "unknown_operation": "未知操作。",
+    "forbidden": "请求被拒绝。",
+    "bad_json": "请求内容格式有误。",
+    "invalid_setting": "这个设置值不被接受。",
+    "unreachable": "连不上这个订阅源，请稍后再试。",
+    "unknown": "出错了。"
   }
 }

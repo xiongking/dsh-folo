@@ -1,9 +1,11 @@
 # dsh-folo
 
-An RSS reader panel for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), modelled on [Folo](https://app.folo.is/). It adds a sidebar entry that opens a three-pane reader: subscriptions on the left, entries in the middle, the article on the right.
+An RSS reader panel for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), modelled on [Folo](https://app.folo.is/). It adds a sidebar entry that opens a two-pane reader: the entry list on the left, the article on the right, and a divider you can drag to set the split.
 
 - **Feed support** — RSS 2.0, RSS 1.0/RDF, and Atom, including CDATA, entities, and feeds served from either a feed URL or a website address that advertises one through `<link rel="alternate">`.
-- **Three-pane reader** — subscriptions, entry list grouped by day, and an article view with sanitized HTML, absolute image links, and keyboard navigation (`↑`/`↓`, `j`/`k`, `s` to star, `o` to open the original).
+- **Two-pane reader** — a day-grouped entry list beside the article, with sanitized HTML, absolute image links, and keyboard navigation (`↑`/`↓`, `j`/`k`, `s` to star, `o` to open the original). Narrow windows collapse to one pane with a back button.
+- **Resizable split** — drag the divider between the list and the article, or focus it and use `←`/`→` (`Shift` for bigger steps). The width is saved with the rest of the settings.
+- **Switchable interface language** — Chinese by default; the settings dialog switches the reader between Chinese, English, and following the Harness locale. Only this panel's wording changes.
 - **State that survives restarts** — unread and starred flags live on the Host, so the sidebar badge and the panel agree after a restart.
 - **Background refresh** — conditional `GET` (`ETag` / `Last-Modified`, `304` handling), four fetches at a time, a ten-minute refresh while the panel is open, and per-feed error reporting.
 - **OPML in and out** — import a library from another reader, or export this one.
@@ -77,7 +79,11 @@ The plugin has no build step and no runtime dependencies — the Host half parse
 
 ## 中文说明
 
-这是一个参照 [Folo](https://app.folo.is/) 做的 DeepSeek Harness RSS 阅读器插件。左侧边栏会多出一个 RSS 图标，点开后是三栏界面：左边订阅源、中间按天分组的文章列表、右边正文。支持 RSS / RDF / Atom，支持填网址自动发现订阅源、OPML 导入导出、未读与收藏、每十分钟自动刷新，也能记住上次的阅读状态。
+这是一个参照 [Folo](https://app.folo.is/) 做的 DeepSeek Harness RSS 阅读器插件。左侧边栏会多出一个 RSS 图标，点开后是双栏界面：左边是按天分组的文章列表，右边是正文。支持 RSS / RDF / Atom，支持填网址自动发现订阅源、OPML 导入导出、未读与收藏、每十分钟自动刷新，也能记住上次的阅读状态。
+
+两栏之间的分隔条可以用鼠标拖动，焦点在分隔条上时也能用 `←`/`→`（按住 `Shift` 步子更大）调整宽度，宽度会和其它设置一起保存。窗口变窄时自动收成单栏，用返回按钮回到列表。
+
+界面默认中文。右上角的设置按钮可以在「简体中文 / English / 跟随 DeepSeek」之间切换，只影响阅读器自身的文案。
 
 面板标题和工具栏会自动测量自己相对窗口的位置：一旦落在 macOS 交通灯按钮的区域内，就向右让开，因此不会被原生窗口按钮遮住。
 
